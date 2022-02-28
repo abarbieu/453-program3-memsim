@@ -3,6 +3,7 @@ import pandas as pd
 from collections import OrderedDict
 
 BLOCKSIZE = 256
+TLBSIZE = 16
 
 
 def checkFrames(frames):
@@ -11,6 +12,30 @@ def checkFrames(frames):
         raise argparse.ArgumentTypeError(f"Number of frames should be between 1 and 256 "
                                          "Given: {frames} is outside this range")
     return frames
+
+
+def searchTLB(TLB, pageNumber):
+    if pageNumber in TLB:
+        frameNumber = TLB[pageNumber]
+        del TLB[pageNumber]
+        TLB[pageNumber] = frameNumber  # for FIFO, update use date
+        return frameNumber
+    return None
+
+
+def addTLB(TLB, pageNumber, frameNumber, iter):
+    if len(TLB) >= TLBSIZE:
+        TLB.popitem(last=False)  # get rid of oldest entry
+    TLB[pageNumber] = frameNumber
+
+
+def findNewFrame(PT, algorithm="FIFO"):
+    if algorithm == "FIFO":
+        pass
+    elif algorithm == "LRU":
+        pass
+    else:
+        raise NotImplementedError
 
 
 if __name__ == "__main__":
@@ -102,7 +127,16 @@ if __name__ == "__main__":
         PT.loc[pageNumber, ["frameNumber", "active", "ref"]] = [
             frameNumber, True, iter]
 
-        # add page to TLB, if already in TLB nothing happens
+        # add page to TLB. If already in TLB, nothing happens
         addTLB(pageNumber, frameNumber, iter)
+
+        # requested data, entry in data
+        dataByte = ord(dataByte[pageOffset])
+        # data is signed
+        if dataByte > (BLOCKSIZE/2) + 1:
+            dataByte = (BLOCKSIZE-dataByte) * -1
+
+        print(
+            f"{reference}, {dataByte}, {frameNumber}, {''.join(['%02X' % ord(x) for x in dataByte]).strip()}")
 
         iter += 1
