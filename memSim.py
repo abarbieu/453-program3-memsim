@@ -30,12 +30,19 @@ def addTLB(TLB, pageNumber, frameNumber, iter):
 
 
 def findNewFrame(PT, algorithm="FIFO"):
+    frameNumber = None
     if algorithm == "FIFO":
-        pass
+        oldestID = PT["init"].argmin()
+        PT.loc[oldestID, "active"] = False
+        frameNumber = PT.loc[oldestID, "frameNumber"]
     elif algorithm == "LRU":
-        pass
+        staleID = PT["ref"].argmin()
+        PT.loc[staleID, "active"] = False
+        frameNumber = PT.loc[staleID, "frameNumber"]
     else:
         raise NotImplementedError
+
+    return frameNumber
 
 
 if __name__ == "__main__":
@@ -43,7 +50,7 @@ if __name__ == "__main__":
         description='Virtal Memory mini simulator for CSC 453 W22')
     parser.add_argument(
         "referencefile", help="File containing list of logical memory addresses")
-    parser.add_argument("frames", type=checkFrames, default=256,
+    parser.add_argument("frames", type=checkFrames,
                         help="Number of frames of the physical address space")
     parser.add_argument("pra", choices=[
                         "FIFO", "LRU", "OPT"], default="FIFO", help="Page replacement algorithm")
@@ -51,7 +58,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Backing store, hard disk, the memory we read from
-    BS = open("./BACKING_STORE.bin")
+    BS = open("./BACKING_STORE.bin", 'rb')
 
     # Page table, 256 entires indexed by page number (0-256), contains frame number (0-frames),
     # final active bit, iteration # used, iteration # last referenced
@@ -85,7 +92,7 @@ if __name__ == "__main__":
 
         # check TLB
         frameNumber = None
-        frameNumber = searchTLB(pageNumber)
+        frameNumber = searchTLB(TLB, pageNumber)
 
         # if not in TLB, look in page table, record TLB miss
         if frameNumber is None:
@@ -107,7 +114,7 @@ if __name__ == "__main__":
             if frameNumber is None:  # RAM hasn't been filled yet, get next available slot
                 frameNumber = ramPointer
                 ramPointer += 1
-                if ramPointer >= 256:
+                if ramPointer >= args.frames:
                     # if this happens, the virtual address is larger than the page table
                     raise ValueError(
                         "Index error, memory address outside of range")
@@ -128,15 +135,20 @@ if __name__ == "__main__":
             frameNumber, True, iter]
 
         # add page to TLB. If already in TLB, nothing happens
-        addTLB(pageNumber, frameNumber, iter)
+        addTLB(TLB, pageNumber, frameNumber, iter)
 
         # requested data, entry in data
-        dataByte = ord(dataByte[pageOffset])
+        referencedByte = frameData[pageOffset]
+        print(referencedByte)
         # data is signed
-        if dataByte > (BLOCKSIZE/2) + 1:
-            dataByte = (BLOCKSIZE-dataByte) * -1
+        if referencedByte > (BLOCKSIZE/2) + 1:
+            referencedByte = (BLOCKSIZE-referencedByte) * -1
 
         print(
-            f"{reference}, {dataByte}, {frameNumber}, {''.join(['%02X' % ord(x) for x in dataByte]).strip()}")
+            f"{reference}, {referencedByte}, {frameNumber}, {''.join(['%02X' % x for x in frameData]).strip()}")
 
         iter += 1
+    print(
+        f"Page Table:\n\tFaults: {pageFaults}\n\tFault Rate: {100*(pageFaults/len(references))}%")
+    print(
+        f"TLB:\n\tHits: {tlbHits}\n\tMisses: {tlbMisses}\n\tHit Rate: {100*(tlbHits/len(references))}%")
