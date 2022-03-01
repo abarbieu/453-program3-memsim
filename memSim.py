@@ -23,26 +23,35 @@ def searchTLB(TLB, pageNumber):
     return None
 
 
-def addTLB(TLB, pageNumber, frameNumber, iter):
-    if len(TLB) >= TLBSIZE:
+def addTLB(TLB, pageNumber, frameNumber):
+    if len(TLB) > TLBSIZE:
         TLB.popitem(last=False)  # get rid of oldest entry
     TLB[pageNumber] = frameNumber
 
 
+def evictTLB(TLB, pageNumber):
+    del TLB[pageNumber]
+
+
 def findNewFrame(PT, algorithm="FIFO"):
+    # Find the page chosen to be evicted, returns open frame number and chosen page
     frameNumber = None
+    evictedPage = None
+    activePages = PT[PT["active"]]
+    evictedIndex = None
+
     if algorithm == "FIFO":
-        oldestID = PT["init"].argmin()
-        PT.loc[oldestID, "active"] = False
-        frameNumber = PT.loc[oldestID, "frameNumber"]
+        evictedIndex = activePages["init"].argmin()
     elif algorithm == "LRU":
-        staleID = PT["ref"].argmin()
-        PT.loc[staleID, "active"] = False
-        frameNumber = PT.loc[staleID, "frameNumber"]
+        evictedIndex = activePages["ref"].argmin()
     else:
         raise NotImplementedError
+    # evicted ID was index into active pages, need index into PT
+    evictedPage = activePages.index[evictedIndex]
+    PT.loc[evictedPage, "active"] = False
+    frameNumber = PT.loc[evictedPage]["frameNumber"]
 
-    return frameNumber
+    return (int(frameNumber), evictedPage)
 
 
 if __name__ == "__main__":
@@ -50,7 +59,7 @@ if __name__ == "__main__":
         description='Virtal Memory mini simulator for CSC 453 W22')
     parser.add_argument(
         "referencefile", help="File containing list of logical memory addresses")
-    parser.add_argument("frames", type=checkFrames,
+    parser.add_argument("frames", type=checkFrames, default=256,
                         help="Number of frames of the physical address space")
     parser.add_argument("pra", choices=[
                         "FIFO", "LRU", "OPT"], default="FIFO", help="Page replacement algorithm")
@@ -67,7 +76,7 @@ if __name__ == "__main__":
     # Transition lookaside buffer, ordered to support FIFO, 16 entries of active pages
     TLB = OrderedDict()
 
-    # Main memory, a list of frames# of frames of size 256
+    # Main memory, a list of frames # of frames
     RAM = [None] * args.frames
     ramPointer = 0
 
@@ -97,7 +106,7 @@ if __name__ == "__main__":
         # if not in TLB, look in page table, record TLB miss
         if frameNumber is None:
             if pageNumber in PT.index:  # if PT doesnt have page number, frame number remains None
-                frameNumber = PT.loc[pageNumber, "frameNumber"]
+                frameNumber = int(PT.loc[pageNumber, "frameNumber"])
             tlbMisses += 1
         else:
             tlbHits += 1
@@ -106,21 +115,20 @@ if __name__ == "__main__":
 
         # if not in page table, find in backing store, record page fault
         if frameNumber is None or not PT.loc[pageNumber, "active"]:
-            # hard miss, find data from disk
+            # hard miss, fetch data from disk
             pageFaults += 1
             BS.seek(pageNumber * BLOCKSIZE)
             frameData = BS.read(BLOCKSIZE)
 
-            if frameNumber is None:  # RAM hasn't been filled yet, get next available slot
+            # page is unititialized or inactive, find new frame
+            if ramPointer < args.frames:
+                # RAM hasn't been filled yet, get next available slot
                 frameNumber = ramPointer
                 ramPointer += 1
-                if ramPointer >= args.frames:
-                    # if this happens, the virtual address is larger than the page table
-                    raise ValueError(
-                        "Index error, memory address outside of range")
             else:
-                # page is inactive, find new frame
-                frameNumber = findNewFrame(PT, algorithm=args.pra)
+                # Evict a page :(
+                frameNumber, evictedPage = findNewFrame(PT, algorithm=args.pra)
+                evictTLB(TLB, evictedPage)
 
             # set page initialization time to current iter
             PT.loc[pageNumber, "init"] = iter
@@ -135,11 +143,10 @@ if __name__ == "__main__":
             frameNumber, True, iter]
 
         # add page to TLB. If already in TLB, nothing happens
-        addTLB(TLB, pageNumber, frameNumber, iter)
+        addTLB(TLB, pageNumber, frameNumber)
 
         # requested data, entry in data
         referencedByte = frameData[pageOffset]
-        print(referencedByte)
         # data is signed
         if referencedByte > (BLOCKSIZE/2) + 1:
             referencedByte = (BLOCKSIZE-referencedByte) * -1
