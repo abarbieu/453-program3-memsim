@@ -33,7 +33,7 @@ def evictTLB(TLB, pageNumber):
     del TLB[pageNumber]
 
 
-def findNewFrame(PT, algorithm="FIFO"):
+def findNewFrame(PT, algorithm, references):
     # Find the page chosen to be evicted, returns open frame number and chosen page
     frameNumber = None
     evictedPage = None
@@ -44,6 +44,8 @@ def findNewFrame(PT, algorithm="FIFO"):
         evictedIndex = activePages["init"].argmin()
     elif algorithm == "LRU":
         evictedIndex = activePages["ref"].argmin()
+    elif algorithm == "OPT":
+        activePages
     else:
         raise NotImplementedError
     # evicted ID was index into active pages, need index into PT
@@ -91,6 +93,9 @@ if __name__ == "__main__":
             references.append(int(line.strip('\n')))
 
     iter = 0
+    refPageNs = list(pd.Series(references).apply(
+        lambda x: format(x, '016b')).apply(lambda x: int(x[:8], 2)))  # for OPT algorithm
+
     # main loop, simulates time passing and job queries
     # iter represents time, used for LRU etc.
     for reference in references:
@@ -127,7 +132,8 @@ if __name__ == "__main__":
                 ramPointer += 1
             else:
                 # Evict a page :(
-                frameNumber, evictedPage = findNewFrame(PT, algorithm=args.pra)
+                frameNumber, evictedPage = findNewFrame(
+                    PT, args.pra, refPageNs[iter:])
                 evictTLB(TLB, evictedPage)
 
             # set page initialization time to current iter
