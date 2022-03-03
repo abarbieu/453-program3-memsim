@@ -33,7 +33,7 @@ def evictTLB(TLB, pageNumber):
     del TLB[pageNumber]
 
 
-def findNewFrame(PT, algorithm, references):
+def findNewFrame(PT, algorithm, pagerefs):
     # Find the page chosen to be evicted, returns open frame number and chosen page
     frameNumber = None
     evictedPage = None
@@ -45,11 +45,19 @@ def findNewFrame(PT, algorithm, references):
     elif algorithm == "LRU":
         evictedIndex = activePages["ref"].argmin()
     elif algorithm == "OPT":
-        activePages
+        unreferenced = [
+            ref for ref in activePages.index if ref not in pagerefs]
+        if len(unreferenced) > 0:
+            # if a page will never be referenced again, evict it first
+            evictedPage = unreferenced[0]
+        else:
+            nextrefs = [ref for ref in pagerefs if ref in activePages.index]
+            evictedPage = nextrefs[-1]  # return latest referenced page
     else:
         raise NotImplementedError
-    # evicted ID was index into active pages, need index into PT
-    evictedPage = activePages.index[evictedIndex]
+    if evictedPage is None:
+        # evicted ID was index into active pages, need index into PT
+        evictedPage = activePages.index[evictedIndex]
     PT.loc[evictedPage, "active"] = False
     frameNumber = PT.loc[evictedPage]["frameNumber"]
 
