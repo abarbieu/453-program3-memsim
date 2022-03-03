@@ -9,9 +9,9 @@
             "cwd": "${fileDirname}",
             "console": "integratedTerminal",
             "args": [
-                "./tests/testrandom",
+                "./tests/test3",
                 "16",
-                "FIFO"
+                "LRU"
             ]
         }
     ]

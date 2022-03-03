@@ -16,16 +16,24 @@ def checkFrames(frames):
 
 def searchTLB(TLB, pageNumber):
     if pageNumber in TLB:
-        frameNumber = TLB[pageNumber]
-        del TLB[pageNumber]
-        TLB[pageNumber] = frameNumber  # for FIFO, update use date
-        return frameNumber
+        # frameNumber = TLB[pageNumber]
+        # del TLB[pageNumber]
+        # TLB[pageNumber] = frameNumber  # for FIFO, update use date
+        # return frameNumber
+        return TLB[pageNumber]
     return None
 
 
 def addTLB(TLB, pageNumber, frameNumber):
-    if len(TLB) > TLBSIZE:
-        TLB.popitem(last=False)  # get rid of oldest entry
+    # print(
+    #     f"\n\nADDTLB, Hit: {pageNumber in TLB} full: {len(TLB) >= TLBSIZE}\n {pageNumber}, {frameNumber}")
+    if pageNumber in TLB:
+        # print("IN TLB")
+        return
+    elif len(TLB) >= TLBSIZE:
+        # get rid of first entry
+        # print(f"\nasdasdasd\n{TLB.popitem(last=False)}\n")
+        TLB.popitem(last=False)
     TLB[pageNumber] = frameNumber
 
 
@@ -169,6 +177,7 @@ if __name__ == "__main__":
             f"{reference}, {referencedByte}, {frameNumber}, {''.join(['%02X' % x for x in frameData]).strip()}")
 
         iter += 1
+    print(f"Number of Translated Addresses: {len(references)}")
     print(
         f"Page Table:\n\tFaults: {pageFaults}\n\tFault Rate: {100*(pageFaults/len(references))}%")
     print(
